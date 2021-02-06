@@ -26,8 +26,8 @@ print("-------------------------------------------------")
 
 # See which drinks can be made concurrently from the menu
 
-possible, no_outlet, insufficient, impossible, status_list =\
- CM.asManyDrinksAsPossible(verbose=True)
+for element in menu:
+	CM.makeDrink(element)
 
 print("-------------------------------------------------")
 print()

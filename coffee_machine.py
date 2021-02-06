@@ -180,7 +180,7 @@ class CoffeeMachine:
 
         # semantic check : refilling should not leave the coffee maachine
         # with negative value
-        if self.raw_material_qty + qty < 0 :
+        if self.raw_material_qty[ingredient] + qty < 0 :
             raise ValueError("Cannot add because final quantity of "+
                 "ingredient after refilling becomes negative")
 
@@ -250,137 +250,90 @@ class CoffeeMachine:
             self.raw_material_qty[ingredient] -= recipe[ingredient]
 
 
-    def __unmakeDrink(self, drink_name):
-        """Method to add back contents of a drink.
-        Only used after it is known that a drink can be made.
-        Assumes populated coffee machine.
+    def makeDrink(self, drink_name):
+        """Method to make a drink order.
 
         Parameters
         ----------
         drink_name : str
-            Name of drink to be made
+            String of drink name.
 
         Returns
         -------
         None
-        """
-        recipe = self.beverages[drink_name]
-
-        for ingredient in recipe:
-            self.raw_material_qty[ingredient] += recipe[ingredient]
-
-
-    def __canMakeDrinksList(self, drinks_list):
-        """Method to check which drinks can be made out of a list of drinks
-        requested by the user.
-
-        Parameters
-        ----------
-        drinks_list : list
-            List of strings of drink names.
-
-        Returns
-        -------
-        possible_drinks : dict
-            Returns a dict of all drinks that can be made. 
-            Values are empty lists, for consistency.
-
-        insufficient_drinks : dict
-            Returns a dict of all drinks with insufficient ingredients.
-            Values are list of insufficient ingredients.
-
-        impossible_drinks : dict
-            Returns a dict of drinks with ingredients that don't exist.
-            Values are list of ingredients not in coffee machine.
-
-        status_list : list
-            Ordered list showing if a drink will be made, or not made due to 
-            impossible ingredient/ insufficient ingredient. Has an integer flag 
-            corresponding to each value in the drinks list.
-            Statuses returned are :
-                1, if drink can be made
-                0, if insufficient ingredients
-                -1, if ingredient not found
 
         """
 
-        # check if all drinks have known recipes, and are strings
-        for drink_name in drinks_list:
-            if not isinstance(drink_name, str):
-                raise ValueError("Drink name is not a string.")
+        # check if drink has known recipe, and is a string
+        if not isinstance(drink_name, str):
+            raise ValueError("Drink name is not a string.")
 
-            if drink_name not in self.beverages:
-                raise ValueError("Drink recipe is not known.")
+        if drink_name not in self.beverages:
+            raise ValueError("Drink recipe is not known.")
 
+        status = self.__canMakeDrink(drink_name)
 
-        possible_drinks = {}
-        insufficient_drinks = {}
-        impossible_drinks = {}
+        # if drink can be made
+        if status == 1:
+            # make it
+            self.__makeDrink(drink_name)
+            print(drink_name + " can be made.")
+            print()
+            print("###########")
 
-        # maintain list of statuses of drinks in the list, to undo later
-        status_list = []
+        # if drink can't be made due to insufficiency
+        elif status == 0:
+            insuff_ing_list = []
+            insuff_ing_qty = []
 
-        # find status for each drink in drinks list
-        for drink in drinks_list:
+            # find which ingredients are insufficient
+            recipe = self.beverages[drink_name]
+            for ingredient in recipe:
+                if self.raw_material_qty[ingredient] < recipe[ingredient]:
+                    insuff_ing_list.append(ingredient)
+                    insuff_ing_qty.append(recipe[ingredient] - 
+                        self.raw_material_qty[ingredient])
 
-            status = self.__canMakeDrink(drink)
-            status_list.append(status)
+            print(drink_name + " cannot be made because some ingredients "+
+                "are not sufficient, which are: ")
+            print(insuff_ing_list)
 
-            # if drink can be made
-            if status == 1:
-                # make it
-                self.__makeDrink(drink)
-                possible_drinks[drink] = []
+            # Refill and make the drink
 
-            # if drink can't be made due to insufficiency
-            elif status == 0:
-                insuff_ing_list = []
+            print("Extra amount of these ingredients required is :")
+            print(insuff_ing_qty)
 
-                # find which ingredients are insufficient
-                recipe = self.beverages[drink]
-                for ingredient in recipe:
-                    if self.raw_material_qty[ingredient] < recipe[ingredient]:
-                        insuff_ing_list.append(ingredient)
+            # refill these ingredients using the method
+            for i in range(len(insuff_ing_list)):
+                self.refill(insuff_ing_list[i], insuff_ing_qty[i])
 
-                # append to dict
-                insufficient_drinks[drink] = insuff_ing_list
+            print("Refilled the ingredients, now they are sufficient "+
+                "for making the drink.")
+            print("Making the drink now.")
+            self.__makeDrink(drink_name)
+            print("Successfully made the drink.")
+            print()
+            print("###########")
+            
+        # if machine doesn't have required ingredients
+        else:  
+            recipe = self.beverages[drink_name]
+            nonex_ing_list = []
 
-            # if machine doesn't have required ingredients
-            else:  
-                recipe = self.beverages[drink]
-                nonex_ing_list = []
+            # find which ingredients don't exist
+            for ingredient in recipe:
+                if ingredient not in self.raw_material_qty:
+                    nonex_ing_list.append(ingredient)
 
-                # find which ingredients don't exist
-                for ingredient in recipe:
-                    if ingredient not in self.raw_material_qty:
-                        nonex_ing_list.append(ingredient)
-
-                # append to dict
-                impossible_drinks[drink] = nonex_ing_list
-
-
-        # undo all drinks, unmade all made drinks
-
-        for i in range(len(status_list)):
-            if status_list[i] == 1:
-                self.__unmakeDrink(drinks_list[i])
-
-        return possible_drinks, insufficient_drinks, impossible_drinks, \
-        status_list
-
-
+            print(drink_name + " cannot be made because some ingredients "+
+                "are not available, which are : ")
+            print(nonex_ing_list)
+            print()
+            print("###########")
 
     
-    def giveIndicatorStatus(self):
-        """Implements an indicator for the coffee machine.
-        Indicator checks if sufficient quantities of each ingredient exist to 
-        make all possible drinks in the current menu of the coffee machine.
-        The idea is to see if all possible drinks can be made at least once
-        using the current contents of the coffee machine. If any drink cannot
-        be made due to insufficient ingredients (not inclusing cases where 
-        ingredient is not in coffee machine), we must refill that.
-
-        Assumes populated coffee machine.
+    def returnIngredientLevel(self):
+        """Returns amount of each ingredient left.
 
         Parameters
         ----------
@@ -388,171 +341,8 @@ class CoffeeMachine:
 
         Returns
         -------
-        ingredients_reqd : dict
+        ingredients_level : dict
             Returns a dict of all ingredients, where the value is the amount of
-            ingredient that needs to be filled to make all drinks once.
-
-            E.g.
-            'hot_water' : 30
-            Means that 30 units of hot water needs to be refilled.
-            In case the value is zero, this means the ingredient is sufficient.
+            ingredient that is left in the machine.
         """
-        menu = self.menu
-        curr_qty = self.raw_material_qty.copy()
-        ingredients_reqd = self.raw_material_qty.copy()
-
-        # set all ingredients to 0
-        ingredients_reqd = ingredients_reqd.fromkeys(ingredients_reqd, 0)
-
-        # make changes based on each drink in menu
-        for drink in menu:
-
-            status = self.__canMakeDrink(drink)
-
-            # if drink cannot be made due to insufficient ingredients
-            # find how much ingredient is needed
-            if status == 0:
-                drink_recipe = self.beverages[drink]
-                for ingredient in drink_recipe:
-
-                    #if drink requires more ingredient than machine has
-                    if drink_recipe[ingredient] > curr_qty[ingredient]:
-                        ingredients_reqd[ingredient] = \
-                        max(ingredients_reqd[ingredient], 
-                            drink_recipe[ingredient] - curr_qty[ingredient])
-
-        return ingredients_reqd
-
-
-    def asManyDrinksAsPossible(self, verbose=False):
-        """Method to make as many drinks as possible, given the coffee machine,
-        and outlets.
-
-        Parameters
-        ----------
-        verbose : True
-            Flag set to true for verbose output.
-
-        Returns
-        -------
-        possible_drinks : dict
-            Returns a dict of all drinks that can be made. 
-            Values are empty lists, for consistency.
-
-        no_outlet_drinks : dict
-            Returns a list of all drinks that can be made, but there aren't
-            sufficient outlets. Values are empty lists for consistency.
-
-        insufficient_drinks : dict
-            Returns a dict of all drinks with insufficient ingredients.
-            Values are list of insufficient ingredients.
-
-        impossible_drinks : dict
-            Returns a dict of drinks with ingredients that don't exist.
-            Values are list of ingredients not in coffee machine.
-
-        status_list : list
-            Ordered list showing if a drink will be made, or not made due to 
-            impossible ingredient/ insufficient ingredient. Has an integer flag 
-            corresponding to each value in the drinks list.
-            Statuses returned are :
-                1, if drink can be made
-                0, if insufficient ingredients
-                -1, if ingredient not found
-                -2, if drink can be made but not enough outlets
-        """
-
-        menu = self.menu
-        num_outlets = self.num_outlets
-        possible, insufficient, impossible, statuses = \
-        self.__canMakeDrinksList(menu)
-
-        no_outlet= {}
-
-        # check if number of possible drinks is greater than outlets
-        if len(possible) > num_outlets :
-            no_outlet = dict(possible.items()[num_outlets:])
-            possible = dict(possible.items()[0:num_outlets])
-
-        # Update status for drinks that can be made but have no outlet
-        for i in range(len(statuses)):
-            if menu[i] in no_outlet:
-                status[i] = -2
-
-        if verbose:
-            print()
-            self.__verboseOutput(possible, no_outlet, insufficient, 
-                impossible, statuses)
-        return possible, no_outlet, insufficient, impossible, statuses
-
-
-    def __verboseOutput(self, possible, no_outlet, insufficient, impossible, 
-        statuses):
-        """Method to print verbose output for which drinks can be made
-        concurrently.
-
-        Parameters
-        ----------
-        possible_drinks : dict
-            Returns a dict of all drinks that can be made. 
-            Values are empty lists, for consistency.
-
-        no_outlet_drinks : dict
-            Returns a list of all drinks that can be made, but there aren't
-            sufficient outlets. Values are empty lists for consistency.
-
-        insufficient_drinks : dict
-            Returns a dict of all drinks with insufficient ingredients.
-            Values are list of insufficient ingredients.
-
-        impossible_drinks : dict
-            Returns a dict of drinks with ingredients that don't exist.
-            Values are list of ingredients not in coffee machine.
-
-        status_list : list
-            Ordered list showing if a drink will be made, or not made due to 
-            impossible ingredient/ insufficient ingredient. Has an integer flag 
-            corresponding to each value in the drinks list.
-            Statuses returned are :
-                1, if drink can be made
-                0, if insufficient ingredients
-                -1, if ingredient not found
-                -2, if drink can be made but not enough outlets
-
-        Returns
-        -------
-
-        None
-
-        """
-
-        menu = self.menu
-
-        for i in range(len(menu)):
-
-            status = statuses[i]
-            # if drink can be made
-            if status == 1:
-                print(menu[i] + " can be made.")
-                print()
-
-            # if insufficient ingredients
-            elif status == 0:
-                print(menu[i] + " cannot be made because some ingredients "+
-                    "are not sufficient, which are: ")
-                print(insufficient[menu[i]])
-                print()
-
-            # if impossible
-            elif status == -1:
-                print(menu[i] + " cannot be made because some ingredients "+
-                    "are not available, which are : ")
-                print(impossible[menu[i]])
-                print()
-
-            else :
-                print(menu[i] + "cannot be made even though all ingredients "+
-                    "are sufficient and available, but the machine does"+
-                    " not have enough outlets.")
-                print()
-
+        return self.raw_material_qty
