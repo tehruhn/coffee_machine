@@ -1,6 +1,11 @@
 # This class simulates a Coffee Machine in Python for solution to
 # the problem posed by HumIt as a part of their interview process.
 
+import threading
+import time
+
+pendingTasks = []
+
 class CoffeeMachine:
     """ Class for simulating a coffee machine. Stores inherent attributes
     of the coffee machine like recipes, number of outlets, and quantity of
@@ -20,13 +25,18 @@ class CoffeeMachine:
 
     menu : list
         Stores names of all drinks that can be made by the machine
+
+    orders : list
+        List of user requested drinks
     """
 
+    global pendingTasks
 
-    def __init__(self, num_outlets=1, beverages={}, raw_material_qty={}):
+    def __init__(self, num_outlets=1, beverages={}, raw_material_qty={}, 
+        orders=[]):
 
         # Check if input is supplied in the correct format
-        self.__checkFormat(num_outlets, beverages, raw_material_qty)
+        self.__checkFormat(num_outlets, beverages, raw_material_qty, orders)
 
         # Check if values make sense semantically
         self.__checkSemantics(num_outlets, beverages, raw_material_qty)
@@ -36,9 +46,10 @@ class CoffeeMachine:
         self.beverages = beverages
         self.raw_material_qty = raw_material_qty
         self.menu = list(beverages.keys())
+        self.orders = orders
 
 
-    def __checkFormat(self, num_outlets, beverages, raw_material_qty):
+    def __checkFormat(self, num_outlets, beverages, raw_material_qty, orders):
         """ Method to check if input is supplied in the correct format to the
         constructor.
         
@@ -53,6 +64,9 @@ class CoffeeMachine:
 
         raw_material_qty : dict
             Stores quantity of raw material in the coffee machine.
+
+        orders : list
+        List of user requested drinkss
 
         Returns
         -------
@@ -103,6 +117,15 @@ class CoffeeMachine:
             if not isinstance(raw_material_qty[ingredient], int):
                 raise ValueError("Quantity of ingredient in raw material"+
                     " list is not an integer.")
+
+        # Orders type checks
+        for drink in orders:
+
+            if not isinstance(drink, str):
+                raise ValueError("Drink name in order is not a string.")
+
+            if drink not in beverages:
+                raise ValueError("Drink recipe for ordered drink is not known.")
 
 
     def __checkSemantics(self, num_outlets, beverages, raw_material_qty):
@@ -229,7 +252,7 @@ class CoffeeMachine:
         return 1
 
 
-    def __makeDrink(self, drink_name):
+    def __pourDrink(self, drink_name):
         """Method to subtract contents of drink. 
         Only used after it is known that a drink can be made. 
         Assumes populated coffee machine.
@@ -276,8 +299,11 @@ class CoffeeMachine:
         # if drink can be made
         if status == 1:
             # make it
-            self.__makeDrink(drink_name)
+            self.__pourDrink(drink_name)
             print(drink_name + " can be made.")
+            print("Now pouring the ingredients ...")
+            # time.sleep(2)
+            print("Done!")
             print()
             print("###########")
 
@@ -294,7 +320,7 @@ class CoffeeMachine:
                     insuff_ing_qty.append(recipe[ingredient] - 
                         self.raw_material_qty[ingredient])
 
-            print(drink_name + " cannot be made because some ingredients "+
+            print(drink_name + " will not be made because some ingredients "+
                 "are not sufficient, which are: ")
             print(insuff_ing_list)
 
@@ -310,10 +336,14 @@ class CoffeeMachine:
             print("Refilled the ingredients, now they are sufficient "+
                 "for making the drink.")
             print("Making the drink now.")
-            self.__makeDrink(drink_name)
-            print("Successfully made the drink.")
+            self.__pourDrink(drink_name)
+            print("Now pouring the ingredients ...")
+            # time.sleep(2)
+            print("Done!")
             print()
             print("###########")
+
+
             
         # if machine doesn't have required ingredients
         else:  
@@ -330,6 +360,41 @@ class CoffeeMachine:
             print(nonex_ing_list)
             print()
             print("###########")
+            time.sleep(2)
+
+    def makeOrder(self):
+        """Class method exposed to the user. Makes 'n' drinks in parallel, 
+        based on the order list supplied by the user.
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        None
+
+        """
+
+        # make another instance of the class to pass to threads
+        duplicateCM = CoffeeMachine(self.num_outlets, self.beverages, 
+            self.raw_material_qty, self.orders)
+
+        # iterate over orders drink wise, spawn parallel processes
+        # but only do this if more processes are allowed
+        for i in range(len(self.orders)):
+            
+            while (len(pendingTasks) > self.num_outlets):
+                time.sleep(0.1)
+
+            pendingTasks.append(i)
+
+            drink_task = ParallelDrinkMaker(duplicateCM, self.orders[i], i)
+
+            drink_task.start()
+
+
+
 
     
     def returnIngredientLevel(self):
@@ -346,3 +411,30 @@ class CoffeeMachine:
             ingredient that is left in the machine.
         """
         return self.raw_material_qty
+
+
+class ParallelDrinkMaker(threading.Thread):
+    """Class for simulating the mixing of 'n' drinks in parallel. 
+    Inherited from the Thread class, implements the 'run' method to execute
+    tasks in parallel. Will be called as a thread class by the CoffeeMachine
+    class. Invisible to user.
+
+    Attributes
+    ----------
+    """
+
+    global pendingTasks
+
+    def __init__(self, sharedCM, drink_name, drink_ID):
+        super(ParallelDrinkMaker, self).__init__()
+        self.sharedCM = sharedCM
+        self.drink_name = drink_name
+        self.drink_ID = drink_ID
+        self.pendingTasks = pendingTasks
+
+    def run(self):
+        """Method that implements the work this thread will do, using the
+        shared class instance.
+        """
+        self.sharedCM.makeDrink(self.drink_name)
+        pendingTasks.remove(self.drink_ID)
