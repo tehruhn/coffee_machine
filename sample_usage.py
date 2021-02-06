@@ -10,7 +10,16 @@ num_outlets = data['machine']['outlets']['count_n']
 beverages = data['machine']['beverages']
 total_items_qty = data['machine']['total_items_quantity']
 
-orders = ['hot_tea', 'black_tea', 'green_tea', 'hot_coffee']
+# orders = ['hot_tea', 'black_tea', 'green_tea', 'hot_coffee']
+
+# Read orders from file
+filename = "test_data/temp_orders.txt"
+f = open(filename, "r")
+orders = f.readlines()
+
+# Remove line breaks from orders
+for i in range(len(orders)):
+    orders[i] = orders[i][:-1]
 
 # Instantiate the Coffee Machine
 CM = CoffeeMachine(num_outlets, beverages, total_items_qty, orders)

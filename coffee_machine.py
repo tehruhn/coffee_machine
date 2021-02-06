@@ -5,6 +5,7 @@ import threading
 import time
 
 pendingTasks = []
+screenlock = threading.Semaphore(value=1)
 
 class CoffeeMachine:
     """ Class for simulating a coffee machine. Stores inherent attributes
@@ -360,7 +361,7 @@ class CoffeeMachine:
             print(nonex_ing_list)
             print()
             print("###########")
-            time.sleep(2)
+            # time.sleep(2)
 
     def makeOrder(self):
         """Class method exposed to the user. Makes 'n' drinks in parallel, 
@@ -380,19 +381,25 @@ class CoffeeMachine:
         duplicateCM = CoffeeMachine(self.num_outlets, self.beverages, 
             self.raw_material_qty, self.orders)
 
+        threads = []
+
         # iterate over orders drink wise, spawn parallel processes
         # but only do this if more processes are allowed
         for i in range(len(self.orders)):
             
             while (len(pendingTasks) > self.num_outlets):
-                time.sleep(0.1)
+                time.sleep(3)
 
             pendingTasks.append(i)
 
             drink_task = ParallelDrinkMaker(duplicateCM, self.orders[i], i)
-
+            threads.append(drink_task)
             drink_task.start()
 
+        for thread in threads:
+            thread.join()
+
+        return
 
 
 
@@ -423,7 +430,7 @@ class ParallelDrinkMaker(threading.Thread):
     ----------
     """
 
-    global pendingTasks
+    global pendingTasks, screenlock
 
     def __init__(self, sharedCM, drink_name, drink_ID):
         super(ParallelDrinkMaker, self).__init__()
@@ -436,5 +443,7 @@ class ParallelDrinkMaker(threading.Thread):
         """Method that implements the work this thread will do, using the
         shared class instance.
         """
+        screenlock.acquire()
         self.sharedCM.makeDrink(self.drink_name)
+        screenlock.release()
         pendingTasks.remove(self.drink_ID)
