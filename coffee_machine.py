@@ -428,6 +428,17 @@ class ParallelDrinkMaker(threading.Thread):
 
     Attributes
     ----------
+    
+    sharedCM : CoffeeMachine
+        Shared instance of CoffeeMachine class, to be used for making drinks.
+
+    drink_name : str
+        Name of drink to be made by this parallel instance
+
+    drink_ID : int
+        Global identifier for drink, which needs to be removed from 
+        the pending process list
+
     """
 
     global pendingTasks, screenlock
@@ -437,7 +448,6 @@ class ParallelDrinkMaker(threading.Thread):
         self.sharedCM = sharedCM
         self.drink_name = drink_name
         self.drink_ID = drink_ID
-        self.pendingTasks = pendingTasks
 
     def run(self):
         """Method that implements the work this thread will do, using the
@@ -445,5 +455,6 @@ class ParallelDrinkMaker(threading.Thread):
         """
         screenlock.acquire()
         self.sharedCM.makeDrink(self.drink_name)
+        print("This was order number " + str(self.drink_ID) + ".")
         screenlock.release()
         pendingTasks.remove(self.drink_ID)
