@@ -28,6 +28,27 @@ class CoffeeMachine:
 
 
     def __init__(self, num_outlets=1, beverages={}, raw_material_qty={}):
+        """Initialized the CoffeeMachine class.
+
+        Paramaters
+        ----------
+
+        num_outlets : int
+            Number of outlets in the coffee machine.
+    
+        beverages : dict
+            Recipes for the various drinks the machine makes.
+            Dictionary with name as key, and a dictionary as value.
+            Value dict has ingredients and required quantities.
+
+        raw_material_qty : dict
+            Stores quantity of raw material in the coffee machine.
+            Dictionary with ingredient as key, and current amount as value.
+
+        Returns
+        -------
+
+        """
 
         # Check if input is supplied in the correct format
         self.__checkFormat(num_outlets, beverages, raw_material_qty)
@@ -66,8 +87,6 @@ class CoffeeMachine:
 
         Returns
         -------
-
-        None
 
         """
 
@@ -137,8 +156,6 @@ class CoffeeMachine:
         Returns
         -------
 
-        None
-
         """
 
         if num_outlets <= 0:
@@ -173,8 +190,6 @@ class CoffeeMachine:
 
         Returns
         -------
-
-        None
 
         """
 
@@ -252,7 +267,6 @@ class CoffeeMachine:
 
         Returns
         -------
-        None
 
         """
         recipe = self.beverages[drink_name]
@@ -274,7 +288,6 @@ class CoffeeMachine:
 
         Returns
         -------
-        None
 
         """
 
@@ -364,13 +377,20 @@ class CoffeeMachine:
         Parameters
         ----------
         orders : list
-        List of user requested drinks
+            List of user requested drinks
 
         Returns
         -------
-        None
 
         """
+
+        # check if single order
+        if isinstance(orders, str):
+            orders = [orders]
+
+        # check if user supplies a list
+        if not isinstance(orders, list):
+            raise ValueError("Orders were expected in a list.")
 
         # Orders type checks
         for drink in orders:
