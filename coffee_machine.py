@@ -4,9 +4,6 @@
 import threading
 import time
 
-pendingTasks = []
-screenlock = threading.Semaphore(value=1)
-
 class CoffeeMachine:
     """ Class for simulating a coffee machine. Stores inherent attributes
     of the coffee machine like recipes, number of outlets, and quantity of
@@ -27,17 +24,13 @@ class CoffeeMachine:
     menu : list
         Stores names of all drinks that can be made by the machine
 
-    orders : list
-        List of user requested drinks
     """
 
-    global pendingTasks
 
-    def __init__(self, num_outlets=1, beverages={}, raw_material_qty={}, 
-        orders=[]):
+    def __init__(self, num_outlets=1, beverages={}, raw_material_qty={}):
 
         # Check if input is supplied in the correct format
-        self.__checkFormat(num_outlets, beverages, raw_material_qty, orders)
+        self.__checkFormat(num_outlets, beverages, raw_material_qty)
 
         # Check if values make sense semantically
         self.__checkSemantics(num_outlets, beverages, raw_material_qty)
@@ -47,10 +40,15 @@ class CoffeeMachine:
         self.beverages = beverages
         self.raw_material_qty = raw_material_qty
         self.menu = list(beverages.keys())
-        self.orders = orders
+
+        # lock for multithreading
+        self.lock = threading.Lock()
+
+        # list of running threads
+        self.running_threads = []
 
 
-    def __checkFormat(self, num_outlets, beverages, raw_material_qty, orders):
+    def __checkFormat(self, num_outlets, beverages, raw_material_qty):
         """ Method to check if input is supplied in the correct format to the
         constructor.
         
@@ -65,9 +63,6 @@ class CoffeeMachine:
 
         raw_material_qty : dict
             Stores quantity of raw material in the coffee machine.
-
-        orders : list
-        List of user requested drinkss
 
         Returns
         -------
@@ -119,14 +114,6 @@ class CoffeeMachine:
                 raise ValueError("Quantity of ingredient in raw material"+
                     " list is not an integer.")
 
-        # Orders type checks
-        for drink in orders:
-
-            if not isinstance(drink, str):
-                raise ValueError("Drink name in order is not a string.")
-
-            if drink not in beverages:
-                raise ValueError("Drink recipe for ordered drink is not known.")
 
 
     def __checkSemantics(self, num_outlets, beverages, raw_material_qty):
@@ -274,13 +261,16 @@ class CoffeeMachine:
             self.raw_material_qty[ingredient] -= recipe[ingredient]
 
 
-    def makeDrink(self, drink_name):
+    def __makeDrink(self, drink_name, drink_ID):
         """Method to make a drink order.
 
         Parameters
         ----------
         drink_name : str
             String of drink name.
+
+        drink_ID : int
+            Drink ID for determining which process it is.
 
         Returns
         -------
@@ -295,81 +285,86 @@ class CoffeeMachine:
         if drink_name not in self.beverages:
             raise ValueError("Drink recipe is not known.")
 
-        status = self.__canMakeDrink(drink_name)
+        with self.lock:
+            status = self.__canMakeDrink(drink_name)
 
-        # if drink can be made
-        if status == 1:
-            # make it
-            self.__pourDrink(drink_name)
-            print(drink_name + " can be made.")
-            print("Now pouring the ingredients ...")
-            # time.sleep(2)
-            print("Done!")
+            print("Currently preparing drink number " + str(drink_ID) + ".")
             print()
-            print("###########")
 
-        # if drink can't be made due to insufficiency
-        elif status == 0:
-            insuff_ing_list = []
-            insuff_ing_qty = []
+            # if drink can be made
+            if status == 1:
+                # make it
+                self.__pourDrink(drink_name)
+                print(drink_name + " can be made.")
+                print("Now pouring the ingredients ...")
+                # time.sleep(2)
+                print("Done!")
+                print()
+                print("###########")
 
-            # find which ingredients are insufficient
-            recipe = self.beverages[drink_name]
-            for ingredient in recipe:
-                if self.raw_material_qty[ingredient] < recipe[ingredient]:
-                    insuff_ing_list.append(ingredient)
-                    insuff_ing_qty.append(recipe[ingredient] - 
-                        self.raw_material_qty[ingredient])
+            # if drink can't be made due to insufficiency
+            elif status == 0:
+                insuff_ing_list = []
+                insuff_ing_qty = []
 
-            print(drink_name + " will not be made because some ingredients "+
-                "are not sufficient, which are: ")
-            print(insuff_ing_list)
+                # find which ingredients are insufficient
+                recipe = self.beverages[drink_name]
+                for ingredient in recipe:
+                    if self.raw_material_qty[ingredient] < recipe[ingredient]:
+                        insuff_ing_list.append(ingredient)
+                        insuff_ing_qty.append(recipe[ingredient] - 
+                            self.raw_material_qty[ingredient])
 
-            # Refill and make the drink
+                print(drink_name + " will not be made because some ingredients "+
+                    "are not sufficient, which are: ")
+                print(insuff_ing_list)
 
-            print("Extra amount of these ingredients required is :")
-            print(insuff_ing_qty)
+                # Refill and make the drink
 
-            # refill these ingredients using the method
-            for i in range(len(insuff_ing_list)):
-                self.refill(insuff_ing_list[i], insuff_ing_qty[i])
+                print("Extra amount of these ingredients required is :")
+                print(insuff_ing_qty)
 
-            print("Refilled the ingredients, now they are sufficient "+
-                "for making the drink.")
-            print("Making the drink now.")
-            self.__pourDrink(drink_name)
-            print("Now pouring the ingredients ...")
-            # time.sleep(2)
-            print("Done!")
-            print()
-            print("###########")
+                # refill these ingredients using the method
+                for i in range(len(insuff_ing_list)):
+                    self.refill(insuff_ing_list[i], insuff_ing_qty[i])
 
+                print("Refilled the ingredients, now they are sufficient "+
+                    "for making the drink.")
+                print("Making the drink now.")
+                self.__pourDrink(drink_name)
+                print("Now pouring the ingredients ...")
+                # time.sleep(2)
+                print("Done!")
+                print()
+                print("###########")
+                
+            # if machine doesn't have required ingredients
+            else:  
+                recipe = self.beverages[drink_name]
+                nonex_ing_list = []
 
-            
-        # if machine doesn't have required ingredients
-        else:  
-            recipe = self.beverages[drink_name]
-            nonex_ing_list = []
+                # find which ingredients don't exist
+                for ingredient in recipe:
+                    if ingredient not in self.raw_material_qty:
+                        nonex_ing_list.append(ingredient)
 
-            # find which ingredients don't exist
-            for ingredient in recipe:
-                if ingredient not in self.raw_material_qty:
-                    nonex_ing_list.append(ingredient)
+                print(drink_name + " cannot be made because some ingredients "+
+                    "are not available, which are : ")
+                print(nonex_ing_list)
+                print()
+                print("###########")
+                # time.sleep(2)
 
-            print(drink_name + " cannot be made because some ingredients "+
-                "are not available, which are : ")
-            print(nonex_ing_list)
-            print()
-            print("###########")
-            # time.sleep(2)
+            self.running_threads.remove(drink_ID)
 
-    def makeOrder(self):
+    def makeOrder(self, orders=[]):
         """Class method exposed to the user. Makes 'n' drinks in parallel, 
         based on the order list supplied by the user.
 
         Parameters
         ----------
-        None
+        orders : list
+        List of user requested drinks
 
         Returns
         -------
@@ -377,22 +372,36 @@ class CoffeeMachine:
 
         """
 
-        # make another instance of the class to pass to threads
-        duplicateCM = CoffeeMachine(self.num_outlets, self.beverages, 
-            self.raw_material_qty, self.orders)
+        # Orders type checks
+        for drink in orders:
 
+            if not isinstance(drink, str):
+                raise ValueError("Drink name in order is not a string.")
+
+            if drink not in self.beverages:
+                raise ValueError("Drink recipe for ordered drink is not known.")
+
+        if len(orders) == 0:
+            print("No orders were given, please give orders.")
+            return
+
+        self.orders = orders
+
+        # list of threads containing tasks
         threads = []
 
         # iterate over orders drink wise, spawn parallel processes
         # but only do this if more processes are allowed
         for i in range(len(self.orders)):
-            
-            while (len(pendingTasks) > self.num_outlets):
+
+            while (len(self.running_threads) > self.num_outlets):
                 time.sleep(3)
 
-            pendingTasks.append(i)
+            self.running_threads.append(i)
 
-            drink_task = ParallelDrinkMaker(duplicateCM, self.orders[i], i)
+            drink_task = threading.Thread(target=self.__makeDrink, 
+                args=(self.orders[i], i))
+
             threads.append(drink_task)
             drink_task.start()
 
@@ -400,9 +409,6 @@ class CoffeeMachine:
             thread.join()
 
         return
-
-
-
     
     def returnIngredientLevel(self):
         """Returns amount of each ingredient left.
@@ -418,43 +424,3 @@ class CoffeeMachine:
             ingredient that is left in the machine.
         """
         return self.raw_material_qty
-
-
-class ParallelDrinkMaker(threading.Thread):
-    """Class for simulating the mixing of 'n' drinks in parallel. 
-    Inherited from the Thread class, implements the 'run' method to execute
-    tasks in parallel. Will be called as a thread class by the CoffeeMachine
-    class. Invisible to user.
-
-    Attributes
-    ----------
-    
-    sharedCM : CoffeeMachine
-        Shared instance of CoffeeMachine class, to be used for making drinks.
-
-    drink_name : str
-        Name of drink to be made by this parallel instance
-
-    drink_ID : int
-        Global identifier for drink, which needs to be removed from 
-        the pending process list
-
-    """
-
-    global pendingTasks, screenlock
-
-    def __init__(self, sharedCM, drink_name, drink_ID):
-        super(ParallelDrinkMaker, self).__init__()
-        self.sharedCM = sharedCM
-        self.drink_name = drink_name
-        self.drink_ID = drink_ID
-
-    def run(self):
-        """Method that implements the work this thread will do, using the
-        shared class instance.
-        """
-        screenlock.acquire()
-        self.sharedCM.makeDrink(self.drink_name)
-        print("This was order number " + str(self.drink_ID) + ".")
-        screenlock.release()
-        pendingTasks.remove(self.drink_ID)
