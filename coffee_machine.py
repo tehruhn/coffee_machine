@@ -414,7 +414,7 @@ class CoffeeMachine:
         # but only do this if more processes are allowed
         for i in range(len(self.orders)):
 
-            while (len(self.running_threads) > self.num_outlets):
+            while (len(self.running_threads) >= self.num_outlets):
                 time.sleep(3)
 
             self.running_threads.append(i)
