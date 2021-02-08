@@ -234,10 +234,10 @@ class CoffeeMachine:
 
         """
         if not isinstance(drink_name, str):
-            raise ValueError("Drink name is not a string.")
+            raise ValueError("Drink name is not a string in canMake.")
 
         if drink_name not in self.beverages:
-            raise ValueError("Drink recipe is not known.")
+            raise ValueError("Drink recipe is not known in canMake.")
 
         # get recipe from coffee machine
         recipe = self.beverages[drink_name]
